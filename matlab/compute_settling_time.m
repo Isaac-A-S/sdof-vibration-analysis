@@ -1,69 +1,36 @@
-﻿function ts = compute_settling_time(t, x, tolerance, referenceMagnitude)
-%COMPUTE_SETTLING_TIME Earliest permanent entry into a tolerance band.
-%
-%   ts = COMPUTE_SETTLING_TIME(t,x,tolerance,referenceMagnitude) returns the
-%   earliest time after which abs(x) remains less than or equal to
-%
-%       tolerance * abs(referenceMagnitude).
-%
-%   The function returns NaN when the response has not settled before the
-%   final supplied time. A linear interpolation estimates the final band
-%   crossing between adjacent samples.
+function ts = compute_settling_time(t, x, tolerance, referenceMagnitude)
+%COMPUTE_SETTLING_TIME Last sampled tolerance-band entry, interpolated.
+% Band: abs(x) <= tolerance*abs(referenceMagnitude).
+% Returns NaN if the last sample is outside; t(1) if all are inside.
+% This finite-record estimate cannot exclude excursions between samples or
+% after t(end). Check time-grid refinement and the model's tail separately.
+% A 32-ULP displacement allowance handles roundoff at a tangential peak;
+% it is numerical slack, not physical design margin.
 
-
-validateattributes(t, {'numeric'}, {'vector','real','finite','nonnegative'}, ...
-    mfilename, 't');
-validateattributes(x, {'numeric'}, {'vector','real','finite'}, ...
-    mfilename, 'x');
-validateattributes(tolerance, {'numeric'}, ...
-    {'scalar','real','finite','positive','<',1}, mfilename, 'tolerance');
-validateattributes(referenceMagnitude, {'numeric'}, ...
-    {'scalar','real','finite','nonzero'}, mfilename, 'referenceMagnitude');
-
-
-if numel(t) ~= numel(x)
-    error('compute_settling_time:SizeMismatch', ...
-        't and x must contain the same number of samples.');
+validateattributes(t, {'numeric'}, {'vector','real','finite','nonnegative','nonempty'}, mfilename, 't');
+validateattributes(x, {'numeric'}, {'vector','real','finite','nonempty'}, mfilename, 'x');
+validateattributes(tolerance, {'numeric'}, {'scalar','real','finite','positive','<',1}, mfilename, 'tolerance');
+validateattributes(referenceMagnitude, {'numeric'}, {'scalar','real','finite','nonzero'}, mfilename, 'referenceMagnitude');
+if numel(t) ~= numel(x) || numel(t) < 2
+    error('compute_settling_time:SizeMismatch', 'Supply at least two matching samples.');
 end
-
-
-t = t(:);
-x = x(:);
-
-
+ t = double(t(:)); x = double(x(:));
 if any(diff(t) <= 0)
-    error('compute_settling_time:NonMonotonicTime', ...
-        't must be strictly increasing.');
+    error('compute_settling_time:NonMonotonicTime', 't must be strictly increasing.');
 end
-
-
-band = tolerance*abs(referenceMagnitude);
-distanceFromBand = abs(x) - band;
-lastOutside = find(distanceFromBand > 0, 1, 'last');
-
-
+referenceMagnitude = abs(double(referenceMagnitude));
+band = double(tolerance)*referenceMagnitude;
+slack = 32*eps(referenceMagnitude);
+lastOutside = find(abs(x) > band+slack, 1, 'last');
 if isempty(lastOutside)
     ts = t(1);
-    return
-end
-
-
-if lastOutside == numel(t)
+elseif lastOutside == numel(t)
     ts = NaN;
-    return
-end
-
-
-t1 = t(lastOutside);
-t2 = t(lastOutside + 1);
-y1 = distanceFromBand(lastOutside);
-y2 = distanceFromBand(lastOutside + 1);
-
-
-% y1 is positive and y2 is non-positive at the final band crossing.
-if y1 == y2
-    ts = t2;
 else
-    ts = t1 - y1*(t2 - t1)/(y2 - y1);
+    j = lastOutside;
+    boundary = sign(x(j))*band;
+    fraction = (boundary-x(j))/(x(j+1)-x(j));
+    fraction = min(1,max(0,fraction));
+    ts = t(j)+fraction*(t(j+1)-t(j));
 end
 end

@@ -1,0 +1,29 @@
+name: MATLAB verification
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: matlab-actions/setup-matlab@v3
+        with:
+          release: R2025b
+      - name: Verify model and export results
+        uses: matlab-actions/run-command@v3
+        with:
+          command: run('tests/run_tests.m'); run('matlab/run_analysis.m'); assert(isfile('figures/free_response_comparison.png')); assert(isfile('figures/energy_decay.png')); assert(isfile('figures/settling_time_sweep.png'));
+      - name: Preserve MATLAB outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: matlab-results
+          path: |
+            figures/*.png
+            figures/*.fig
+            data/*.csv
+            data/run_environment.txt
