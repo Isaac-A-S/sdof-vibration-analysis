@@ -1,306 +1,127 @@
-﻿# Transient Response and Damping Design of an SDOF Oscillator
+# SDOF Vibration and Damping Analysis
 
+[![MATLAB verification](https://github.com/Isaac-A-S/sdof-vibration-analysis/actions/workflows/matlab.yml/badge.svg)](https://github.com/Isaac-A-S/sdof-vibration-analysis/actions/workflows/matlab.yml)
 
-Analytical and numerical study of how viscous damping changes the free response of a linear mass–spring–damper system.
+A MATLAB study of the free response of a linear mass–spring–damper system: derive the response, compare damping regimes, verify the implementation, and examine a 2% reverse-peak design requirement.
 
+**Scope:** one translational degree of freedom, constant linear stiffness and viscous damping, and prescribed initial conditions. Parameters are illustrative. This is a numerical vibration study with no experimental calibration or aircraft-specific validation.
 
-## Overview
+![Normalized free response across six damping cases](figures/free_response_comparison.png)
 
+## Run the project
 
-This project models the post-disturbance motion of a single-degree-of-freedom (SDOF) oscillator,
+Clone or download and **extract** the repository. In MATLAB, set the Current Folder to the repository root (the folder containing this README), then run:
 
+```matlab
+run('tests/run_tests.m')
+run('matlab/run_analysis.m')
+```
 
-$$m\ddot{x}+c\dot{x}+kx=0,$$
+The scripts use base MATLAB; Simulink and Control System Toolbox are not required. The automated workflow targets **MATLAB R2025b on Linux**. `exportgraphics` requires R2020a or later; other releases have not been systematically tested.
 
+The analysis writes CSV results, PNG images, editable `.fig` files, and a run-environment record. To edit a generated figure in MATLAB:
 
-and compares underdamped, critically damped, and overdamped behavior. The work combines closed-form solutions, nondimensional analysis, response metrics, and numerical verification with MATLAB.
+```matlab
+openfig('figures/free_response_comparison.fig')
+```
 
+The scripts clear workspace variables; the analysis also closes open figures. Save unrelated work first. The relative `run(...)` commands above must start at the repository root; pressing Run in the open script also works because internal output paths are based on the script location.
 
-The model can represent an isolated structural mode in many systems, including vibration isolators, suspensions, machinery, and simplified aerospace structures. The numerical parameters used here are illustrative; this repository does not claim to predict the response of a specific aircraft or passenger comfort.
+## Model and assumptions
 
+$$m\ddot{x}+c\dot{x}+kx=0,\qquad x(0)=x_0,\quad\dot{x}(0)=v_0.$$
 
-## Engineering objectives
+Here $x$ is displacement from static equilibrium. The spring force is $-kx$ and the damper force is $-c\dot{x}$. Constant weight is absorbed into the equilibrium position. There is no time-dependent forcing after release.
 
+$$\omega_n=\sqrt{k/m},\qquad c_{\mathrm{crit}}=2\sqrt{km},\qquad \zeta=c/c_{\mathrm{crit}}.$$
 
-- Derive the governing equation from a free-body model.
+| Input | Value | Meaning |
+| --- | ---: | --- |
+| $m$ | 1,000 kg | Lumped mass |
+| $k$ | 40,000 N/m | Linear stiffness |
+| $x_0$ | 0.50 m | Release displacement |
+| $v_0$ | 0 m/s | Release from rest |
+| $\omega_n$ | 6.3246 rad/s | Undamped natural frequency |
+| $c_{\mathrm{crit}}$ | 12,649.1 N·s/m | Critical damping coefficient |
 
+The model assumes a linear spring over the chosen displacement range; no actual geometry establishes that range here. The initial acceleration is $-20\ \mathrm{m/s^2}$ and the initial stored energy is 5,000 J. These are consequences of the illustrative inputs, not measured performance.
 
-- Express the dynamics using natural frequency and damping ratio.
+For $0\leq\zeta<1$, the characteristic roots are complex, producing decaying oscillation when $c>0$. Critical damping has a repeated real root; overdamping has two distinct negative real roots. Full initial-condition solutions, energy balance, nondimensionalization, and the damping-design derivation are in [docs/derivation.md](docs/derivation.md).
 
+## Results
 
-- Implement exact free-response solutions for all damping regimes.
+The nominal 2% band is $|x|\leq0.02|x_0|=0.01$ m. Settling means remaining within it, not merely crossing zero once.
 
+| Damping $c$ (N·s/m) | $\zeta$ | Regime | 2% settling time (s) | First reverse peak (% of $|x_0|$) |
+| ---: | ---: | --- | ---: | ---: |
+| 2,000 | 0.158 | Underdamped | 3.659 | 60.468 |
+| 6,000 | 0.474 | Underdamped | 1.305 | 18.401 |
+| 9,862.6 | 0.780 | 2% boundary design | 0.570 | 2.000 |
+| 12,000 | 0.949 | Near critical | 0.829 | 0.00807 |
+| 12,649.1 | 1.000 | Critical | 0.922 | None |
+| 16,000 | 1.265 | Overdamped | 1.350 | None |
 
-- Quantify settling time, reverse peak, and energy dissipation.
+[Full precision case table](data/case_summary.csv). `NaN` in the frequency and envelope-half-life columns denotes a metric not used for a nonoscillatory branch; it does not indicate solver failure. Reverse-peak values assume release from rest. The script's parameter set is a defined experiment; changing `v0` also requires revisiting these metrics.
 
+### Energy dissipation
 
-- Verify the analytical solution against MATLAB's ode45 integrator.
+$$E=\tfrac12m\dot{x}^2+\tfrac12kx^2,\qquad\dot E=-c\dot{x}^2\leq0.$$
 
+![Mechanical energy on a logarithmic axis](figures/energy_decay.png)
 
-- Show that the preferred damping level depends on the design requirement.
+Displacement can increase while total energy decreases because energy moves between spring storage and mass motion. Energy is constant for $c=0$; with damping its derivative is zero at turning points where velocity is zero. The plotted lower limit hides energy below $10^{-12}E_0$; it does not mean energy becomes exactly zero.
 
+### Damping tradeoff
 
-## Model
+For release from rest, the first reverse peak occurs at $t_p=\pi/\omega_d$, with
 
+$$M_p=e^{-\pi\zeta/\sqrt{1-\zeta^2}},\qquad
+\zeta_\delta=\frac{-\ln\delta}{\sqrt{\pi^2+(\ln\delta)^2}}.$$
 
-| Symbol | Quantity | Units |
-| --- | --- | --- |
-| $m$ | equivalent modal mass | kg |
-| $c$ | viscous damping coefficient | N·s/m |
-| $k$ | equivalent stiffness | N/m |
-| $x(t)$ | displacement from equilibrium | m |
-| $x_0$ | initial displacement | m |
-| $v_0$ | initial velocity | m/s |
+Setting $\delta=0.02$ gives $\zeta=0.779703$. This is a **nominal reverse-peak boundary**, not a universal optimal damping ratio. With fixed mass, stiffness, and release from rest, critical damping is the fastest monotonic return among constant damping choices. Allowing a small sign reversal changes the requirement.
 
+![Settling time versus damping ratio](figures/settling_time_sweep.png)
 
-The derived parameters are
+The sharp drops occur when an oscillation peak falls inside the tolerance band. The response itself remains smooth as damping changes. At the highlighted boundary the first negative peak touches exactly −2%; slightly less damping pushes it outside and delays settling. A hardware design would need margin for parameter uncertainty.
 
+## Verification and reproducibility
 
-$$\omega_n=\sqrt{\frac{k}{m}},\qquad
-c_{\mathrm{crit}}=2\sqrt{km},\qquad
-\zeta=\frac{c}{c_{\mathrm{crit}}}.$$
+`tests/run_tests.m` checks initial conditions; displacement against `ode45`; energy dissipation; continuity around critical damping; the design value; selected overdamped monotonicity; general initial states against `expm`; differential consistency; settling-helper edge cases; and grid/horizon sensitivity. Both velocity and displacement are checked with `expm`, including nonzero initial velocities and near-critical inputs.
 
+The earlier local MATLAB run reported a maximum displacement discrepancy of approximately $1.07\times10^{-11}$ m against `ode45`, with relative tolerance $10^{-10}$ and absolute tolerance $10^{-12}$. This is numerical agreement for the selected problem, **not physical measurement accuracy**. The updated script records per-case errors and the actual MATLAB release on every run; exact last digits can vary.
 
-The damping ratio $\zeta$ is more useful than $c$ alone because it identifies the response regime independently of the chosen mass and stiffness:
+The case grid uses 0.0001 s spacing over 4 s; the design sweep uses 0.001 s spacing over 15 s. `ode45` chooses adaptive internal steps; `tVerify` requests output times rather than setting its internal step size. Settling estimates are finite-record measurements with interpolation. A fine grid can still miss a narrow excursion; tail bounds and grid refinement are discussed in the derivation.
 
+The checked-in dark-label PNGs were rendered with the optional [Python presentation script](tools/render_clean_figures.py), which evaluates the same nominal closed-form case study. They are not photographs or test measurements. MATLAB regenerates equivalent plots with explicit dark labels and exports editable `.fig` files; typography can differ. To reproduce the checked-in presentation style:
 
-- $0\leq\zeta\<1$: underdamped
+```sh
+python -m pip install -r tools/requirements.txt
+python tools/render_clean_figures.py
+```
 
+The [GitHub Actions workflow](.github/workflows/matlab.yml) runs verification and analysis in MATLAB and retains CSV, PNG, `.fig`, and environment records in the `matlab-results` artifact. Its status is shown above. Passing checks verify the implementation against mathematical expectations; physical validation would require measurements and identified parameters.
 
-- $\zeta=1$: critically damped
+## Files
 
+| Location | Purpose |
+| --- | --- |
+| `matlab/free_response.m` | Closed-form displacement, velocity, acceleration, and parameter metadata |
+| `matlab/compute_settling_time.m` | Sampled tolerance-band measurement |
+| `matlab/run_analysis.m` | Case study, numerical comparison, metrics, and exports |
+| `tests/run_tests.m` | Ten groups of verification checks |
+| `docs/derivation.md` | Governing model and mathematical derivations |
+| `figures/` | Three figures and provenance notes |
+| `data/case_summary.csv` | Nominal case results |
+| `tools/` | Optional Python presentation renderer |
 
-- $\zeta>1$: overdamped
+## Boundaries and possible extensions
 
-
-For the underdamped case,
-
-
-$$\omega_d=\omega_n\sqrt{1-\zeta^2}$$
-
-
-and, for the initial conditions used in this study $(x_0=0.50\ \mathrm{m},\,v_0=0)$,
-
-
-$$x(t)=x_0e^{-\zeta\omega_nt}
-\left[
-\cos(\omega_dt)+\frac{\zeta\omega_n}{\omega_d}\sin(\omega_dt)
-\right].$$
-
-
-The critical and overdamped solutions are implemented separately to avoid numerical instability near $\zeta=1$. See [the complete derivation](docs/derivation.md).
-
-
-## Illustrative parameter set
-
-
-| Parameter | Value |
-| --- | ---: |
-| Equivalent mass, $m$ | 1000 kg |
-| Equivalent stiffness, $k$ | 40,000 N/m |
-| Initial displacement, $x_0$ | 0.50 m |
-| Initial velocity, $v_0$ | 0 m/s |
-| Natural frequency, $\omega_n$ | 6.3246 rad/s |
-| Natural frequency, $f_n$ | 1.0066 Hz |
-| Critical damping, $c_{\mathrm{crit}}$ | 12,649.1 N·s/m |
-
-
-Because these values are not identified from test data, all dimensional results should be interpreted as a controlled case study. The normalized trends in $x/x_0$ versus $\omega_n t$ are the general result.
-
-
-## Case comparison
-
-
-The 2% settling time is defined as the earliest time after which
-
-
-$$|x(t)|\leq 0.02|x_0|$$
-
-
-remains true.
-
-
-| $c$ (N·s/m) | $\zeta$ | Regime | $\omega_d$ (rad/s) | 2% settling time (s) | First reverse peak (% of $x_0$) |
-| ---: | ---: | --- | ---: | ---: | ---: |
-| 2,000 | 0.158 | underdamped | 6.245 | 3.659 | 60.468 |
-| 6,000 | 0.474 | underdamped | 5.568 | 1.305 | 18.401 |
-| 9,862.6 | 0.780 | underdamped — 2% design | 3.960 | 0.570 | 2.000 |
-| 12,000 | 0.949 | underdamped | 2.000 | 0.830 | 0.008 |
-| 12,649.1 | 1.000 | critical | — | 0.923 | none |
-| 16,000 | 1.265 | overdamped | — | 1.350 | none |
-
-
-The complete values are stored in [data/case_summary.csv](data/case_summary.csv).
-
-
-## Key findings
-
-
-1. **Damping dissipates mechanical energy.** With
-
-
-$$E=\frac12m\dot{x}^2+\frac12kx^2,$$
-
-
-the equation of motion gives
-
-
-$$\frac{dE}{dt}=-c\dot{x}^2\leq0.$$
-
-
-This provides both a physical interpretation and a validation check for the simulation.
-
-
-2. **More damping is not always faster.** Increasing $\zeta$ suppresses oscillation, but an overdamped response contains a slow exponential mode. In the selected cases, $c=16{,}000$ N·s/m settles more slowly than the near-critical $c=12{,}000$ N·s/m case.
-
-
-3. **The design target determines the preferred damping ratio.**
-
-
-- If sign reversal is prohibited, $\zeta=1$ is the fastest monotonic return to equilibrium.
-
-
-- If a reverse peak up to 2% is acceptable, the boundary
-
-
-$$e^{-\pi\zeta/\sqrt{1-\zeta^2}}=0.02$$
-
-
-gives $\zeta=0.7797$. For the illustrative system, this corresponds to $c=9862.6$ N·s/m and approximately 0.570 s to enter and remain inside the ±2% band.
-
-
-4. **The initial acceleration exposes the limits of the dimensional example.** Because $v_0=0$,
-
-
-$$\ddot{x}(0)=-\frac{k}{m}x_0=-20\ \mathrm{m/s^2}.$$
-
-
-This large value reinforces that the parameters are illustrative rather than calibrated aircraft data.
-
-
-## Repository structure
-
-
-~~~text
-sdof-vibration-analysis/
-├── README.md
-├── LICENSE
-├── .gitignore
-├── data/
-│   └── case_summary.csv
-├── docs/
-│   └── derivation.md
-├── matlab/
-│   ├── run_analysis.m
-│   ├── free_response.m
-│   └── compute_settling_time.m
-├── tests/
-│   └── run_tests.m
-└── figures/README.md
-~~~
-
-
-## Running the analysis
-
-
-1. Clone or download the repository.
-
-
-2. Open MATLAB in the repository root.
-
-
-3. Run:
-
-
-~~~matlab
-run("matlab/run_analysis.m")
-~~~
-
-
-The script calculates all damping cases, compares each analytical response with ode45, writes the case table, and exports publication-ready figures to the figures directory. No add-on toolbox is required.
-
-
-Run the validation checks with:
-
-
-~~~matlab
-run("tests/run_tests.m")
-~~~
-
-
-## Verification strategy
-
-
-The repository checks more than whether a curve looks reasonable:
-
-
-- the analytical solution satisfies the specified initial displacement and velocity;
-
-
-- analytical displacement agrees with an independent ode45 integration;
-
-
-- total mechanical energy is non-increasing for $c\geq0$;
-
-
-- underdamped, critical, and overdamped branches remain continuous near $\zeta=1$;
-
-
-- every reported settling time uses the same explicit ±2% definition.
-
-
-## Engineering scope and limitations
-
-
-This is a linear, lumped-parameter, free-response model. It assumes one translational degree of freedom, constant $m$, $c$, and $k$, small displacement, and viscous damping. A real flexible aircraft includes multiple bending and torsional modes, rigid-body coupling, aerodynamic forces, and time-dependent gust excitation. NASA flexible-aircraft studies use multi-degree-of-freedom or distributed structural models and explicit gust inputs rather than a single initial displacement.
-
-
-Accordingly, the project demonstrates vibration-analysis methods; it does not establish an aircraft design recommendation or a passenger-comfort prediction.
-
-
-## Next extensions
-
-
-- Add a forcing input $F(t)$ for discrete gusts or continuous turbulence.
-
-
-- Model base excitation rather than initial-displacement-only response.
-
-
-- Convert the system to state-space form for controls work.
-
-
-- Identify $m$, $c$, and $k$ from measured free-decay data.
-
-
-- Extend the model to multiple coupled structural modes.
-
-
-- Compare passive damping with active feedback control.
-
-
-- Evaluate acceleration or RMS acceleration only after defining a physically valid output location and comfort criterion.
-
+No gust forcing, base excitation, nonlinear stiffness, multiple modes, stress prediction, or active controller is included. A forced-response extension would begin with $m\ddot{x}+c\dot{x}+kx=F(t)$ and a defined input. A physical prototype would require parameter identification and measured validation before design claims.
 
 ## References
 
+- [MathWorks: ode45](https://www.mathworks.com/help/matlab/ref/ode45.html) — numerical integration.
+- [MathWorks: expm](https://www.mathworks.com/help/matlab/ref/expm.html) — matrix exponential verification.
+- [MathWorks: exportgraphics](https://www.mathworks.com/help/matlab/ref/exportgraphics.html) — figure exports.
 
-- E. Kreyszig, *Advanced Engineering Mathematics*, Wiley.
-
-
-- R. C. Hibbeler, *Engineering Mechanics: Dynamics*, Pearson.
-
-
-- N. T. Nguyen and I. Tuzcu, [Flight Dynamics of Flexible Aircraft with Aeroelastic and Inertial Force Interactions](https://ntrs.nasa.gov/citations/20100023415), NASA Technical Reports Server.
-
-
-- C. J. Funk, B. Perry III, and W. A. Silva, [A Summary of Revisions Applied to a Turbulence Response Analysis Method for Flexible Aircraft Configurations](https://ntrs.nasa.gov/citations/20140011901), NASA Technical Reports Server.
-
-
-- MathWorks, [ode45 documentation](https://www.mathworks.com/help/matlab/ref/ode45.html).
-
-
-## Author
-
-
-Isaac — mechanical engineering student focused on dynamics, controls, and aerospace systems.
+Isaac Shah · Mechanical Engineering, University of Houston · [MIT license](LICENSE.txt)

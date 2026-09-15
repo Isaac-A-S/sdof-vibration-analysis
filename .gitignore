@@ -5,3 +5,7 @@ codegen/
 *.mex*
 .DS_Store
 Thumbs.db
+# Generated editable figures and run-specific verification records
+figures/*.fig
+data/ode45_verification.csv
+data/run_environment.txt
