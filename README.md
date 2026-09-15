@@ -88,7 +88,7 @@ The sharp drops occur when an oscillation peak falls inside the tolerance band. 
 
 `tests/run_tests.m` checks initial conditions; displacement against `ode45`; energy dissipation; continuity around critical damping; the design value; selected overdamped monotonicity; general initial states against `expm`; differential consistency; settling-helper edge cases; and grid/horizon sensitivity. Both velocity and displacement are checked with `expm`, including nonzero initial velocities and near-critical inputs.
 
-The earlier local MATLAB run reported a maximum displacement discrepancy of approximately $1.07\times10^{-11}$ m against `ode45`, with relative tolerance $10^{-10}$ and absolute tolerance $10^{-12}$. This is numerical agreement for the selected problem, **not physical measurement accuracy**. The updated script records per-case errors and the actual MATLAB release on every run; exact last digits can vary.
+The [MATLAB R2025b verification run](https://github.com/Isaac-A-S/sdof-vibration-analysis/actions/runs/34921465948) passed all ten check groups and reported a maximum displacement discrepancy of approximately $1.07\times10^{-11}$ m against `ode45`, with relative tolerance $10^{-10}$ and absolute tolerance $10^{-12}$. This is numerical agreement for the selected problem, **not physical measurement accuracy**. The updated script records per-case errors and the actual MATLAB release on every run; exact last digits can vary.
 
 The case grid uses 0.0001 s spacing over 4 s; the design sweep uses 0.001 s spacing over 15 s. `ode45` chooses adaptive internal steps; `tVerify` requests output times rather than setting its internal step size. Settling estimates are finite-record measurements with interpolation. A fine grid can still miss a narrow excursion; tail bounds and grid refinement are discussed in the derivation.
 
@@ -117,6 +117,10 @@ The [GitHub Actions workflow](.github/workflows/matlab.yml) runs verification an
 ## Boundaries and possible extensions
 
 No gust forcing, base excitation, nonlinear stiffness, multiple modes, stress prediction, or active controller is included. A forced-response extension would begin with $m\ddot{x}+c\dot{x}+kx=F(t)$ and a defined input. A physical prototype would require parameter identification and measured validation before design claims.
+
+## Technical walkthrough
+
+[Model, MATLAB, numerical verification, and practice guide](docs/study-guide.md) — derivations, code explanations, experiments, and engineering review questions.
 
 ## References
 
