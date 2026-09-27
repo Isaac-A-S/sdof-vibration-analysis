@@ -118,10 +118,6 @@ The [GitHub Actions workflow](.github/workflows/matlab.yml) runs verification an
 
 No gust forcing, base excitation, nonlinear stiffness, multiple modes, stress prediction, or active controller is included. A forced-response extension would begin with $m\ddot{x}+c\dot{x}+kx=F(t)$ and a defined input. A physical prototype would require parameter identification and measured validation before design claims.
 
-## Technical walkthrough
-
-[Model, MATLAB, numerical verification, and practice guide](docs/study-guide.md) — derivations, code explanations, experiments, and engineering review questions.
-
 ## References
 
 - [MathWorks: ode45](https://www.mathworks.com/help/matlab/ref/ode45.html) — numerical integration.
